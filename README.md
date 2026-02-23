@@ -314,6 +314,103 @@ Config: `"elements": ["done"]`
 
 Config: `"elements": []` — no outputs, end of funnel.
 
+### API Integration — External Service Call with Response-Based Branching
+
+Call an external API and route the user to different next steps based on the response. Each element becomes a separate output handle on the Canvas, so you wire different paths.
+
+**pages/eligibility-check/index.html**
+```html
+<section data-sirius-page>
+  <div id="checking" class="loading">
+    <div class="spinner"></div>
+    <h2>Checking your eligibility...</h2>
+  </div>
+  <div id="error" class="hidden">
+    <h2>Something went wrong</h2>
+    <button data-element-id="retry">Try Again</button>
+  </div>
+</section>
+```
+
+**pages/eligibility-check/check.js**
+```js
+const bag = window.__sirius.bag;
+
+fetch('https://api.example.com/eligibility', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    email: bag.email,
+    skin_type: bag.skin_type,
+    age_range: bag.age_range,
+  }),
+})
+  .then(res => res.json())
+  .then(data => {
+    // Store response data in the bag for later pages
+    bag.recommendation = data.recommendation;
+    bag.score = data.score;
+    bag.products = data.recommended_products;
+
+    // Route based on response — each goes to a different Canvas output
+    if (data.eligible) {
+      window.__sirius.complete("eligible");
+    } else {
+      window.__sirius.complete("not-eligible");
+    }
+  })
+  .catch(() => {
+    // Show error UI with retry button
+    document.getElementById('checking').classList.add('hidden');
+    document.getElementById('error').classList.remove('hidden');
+  });
+```
+
+**Config:**
+```json
+"eligibility-check": {
+  "file": "pages/eligibility-check/index.html",
+  "elements": ["eligible", "not-eligible", "retry"],
+  "scripts": ["pages/eligibility-check/check.js"]
+}
+```
+
+On the Canvas: "eligible" → personalized offer page, "not-eligible" → alternative page, "retry" → loops back.
+
+### Personalized Results from Bag Data
+
+Pages that read data stored by previous steps (quiz answers, API responses) and render personalized content.
+
+```html
+<section data-sirius-page>
+  <h1>Your Personalized Plan</h1>
+  <p>Based on your {{skin_type}} skin, we recommend:</p>
+  <p>{{recommendation}}</p>
+  <div id="score-display"></div>
+  <button data-element-id="cta">{{cta_text}}</button>
+</section>
+
+<script>
+  const bag = window.__sirius.bag;
+  const el = document.getElementById('score-display');
+  el.textContent = `Your skin health score: ${bag.score}/100`;
+</script>
+```
+
+Config: `"elements": ["cta"]`
+
+## Runtime API — `window.__sirius`
+
+Every page has access to the `window.__sirius` object. This is the bridge between page JS and the funnel runtime.
+
+| API | Description |
+|-----|-------------|
+| `window.__sirius.bag` | Session data object. Read/write any key — changes persist across steps via localStorage. |
+| `window.__sirius.bag.email` | Read a value stored by a previous step. |
+| `window.__sirius.bag.score = 85` | Write a value (available to all subsequent steps as `{{score}}`). |
+| `window.__sirius.complete("element-id")` | Trigger navigation via an element. Same as if the user clicked a `data-element-id` button — fires tracking events, applies bag writes, navigates to the connected step. |
+| `window.__sirius.navigateTo("step-slug")` | Navigate directly to a step by slug (advanced — prefer `complete()`). |
+
 ## Adding a New Page
 
 1. Create your HTML file (and optional JS/CSS) in `pages/`
