@@ -133,9 +133,13 @@ Variables are replaced with actual content at runtime. They come from two source
 1. **Props** — configured by the user in the Canvas editor (e.g., `{{title}}`, `{{button_text}}`)
 2. **Session Bag** — collected from the user during the funnel (e.g., `{{name}}`, `{{email}}`)
 
-### Elements `data-element-id="..."`
+### Navigation — How Pages Move to the Next Step
 
-Every interactive element must have a `data-element-id` attribute **and** be listed in `elements` in the config.
+There are 3 ways a page can trigger navigation to the next step:
+
+#### 1. Click — user clicks a button
+
+The most common. Add `data-element-id` to clickable elements. Each one becomes an output handle on the Canvas.
 
 ```html
 <!-- Single CTA — elements: ["cta"] -->
@@ -152,6 +156,53 @@ Every interactive element must have a `data-element-id` attribute **and** be lis
   <button type="submit" data-element-id="submit">Get Results</button>
 </form>
 ```
+
+#### 2. Programmatic — JS triggers when ready
+
+For loading screens, animations, API calls. Call `window.__sirius.complete("element-id")` from JS when the page is done.
+
+```html
+<section data-sirius-page>
+  <div class="animation" id="anim"></div>
+  <h2>Personalizing your experience...</h2>
+</section>
+
+<script>
+  // After animation completes
+  playAnimation('#anim', () => {
+    window.__sirius.complete("done")
+  })
+
+  // Or after a timer
+  setTimeout(() => window.__sirius.complete("done"), 3000)
+
+  // Or after an API call
+  fetch('/api/analyze').then(res => res.json()).then(data => {
+    window.__sirius.bag.results = data
+    window.__sirius.complete("done")
+  })
+</script>
+```
+
+Config: `"elements": ["done"]` — same as any other element, the Canvas connects it to the next step.
+
+#### 3. No navigation — end of funnel
+
+The page doesn't navigate anywhere. Used for final "thank you" screens or results pages with no CTA. Config: `"elements": []`
+
+### Elements Summary
+
+Every entry in `elements` is an output handle on the Canvas. It doesn't matter whether it's triggered by a click or by JS — the Canvas just sees outputs.
+
+```
+elements: ["submit"]                              → 1 output (linear)
+elements: ["yes", "no"]                           → 2 outputs (branching)
+elements: ["oily", "dry", "combo", "normal"]      → 4 outputs (quiz)
+elements: ["done"]                                → 1 output (programmatic)
+elements: []                                      → 0 outputs (end page)
+```
+
+Every `data-element-id` in HTML and every `window.__sirius.complete("id")` call must match an entry in `elements`.
 
 ### Forms and Data Collection
 
@@ -223,7 +274,7 @@ Config: `"elements": ["submit"]`
 
 Config: `"elements": ["cta"]`
 
-### Animated Loading / Interstitial
+### Loading / Interstitial (programmatic advance)
 
 ```html
 <section data-sirius-page>
@@ -243,9 +294,25 @@ Config: `"elements": ["cta"]`
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
+
+<script>
+  // Auto-advance after 3 seconds
+  setTimeout(() => window.__sirius.complete("done"), 3000)
+</script>
 ```
 
-Config: `"elements": ["auto"]` — auto-advance after a timeout set in the Canvas.
+Config: `"elements": ["done"]`
+
+### Thank You / End Page (no navigation)
+
+```html
+<section data-sirius-page>
+  <h1>Thank you, {{name}}!</h1>
+  <p>We'll send your results to {{email}}.</p>
+</section>
+```
+
+Config: `"elements": []` — no outputs, end of funnel.
 
 ## Adding a New Page
 
@@ -275,7 +342,8 @@ Config: `"elements": ["auto"]` — auto-advance after a timeout set in the Canva
 - All files must be inside `pages/`
 - Every page must be registered in `sirius.config.json`
 - Page slugs must be unique, kebab-case
-- Every `data-element-id` in HTML must be listed in `elements` in the config
+- Every `data-element-id` and `window.__sirius.complete("id")` must match an entry in `elements`
 - Use `{{variables}}` for dynamic content (HTML only, not in JS/CSS files)
 - Access session data in JS via `window.__sirius.bag`
+- Trigger programmatic navigation via `window.__sirius.complete("element-id")`
 - No external CDN dependencies — bundle everything locally or inline
