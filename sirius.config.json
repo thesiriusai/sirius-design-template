@@ -5,17 +5,5 @@
       "file": "pages/hero.html",
       "format": "html"
     }
-  },
-  "components": {
-    "button": {
-      "file": "components/button.html",
-      "format": "html"
-    }
-  },
-  "brand": {
-    "tokens": {
-      "file": "brand/tokens.json",
-      "format": "json"
-    }
   }
 }
