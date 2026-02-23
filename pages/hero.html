@@ -1,4 +1,12 @@
-<section class="hero">
-  <h1>Welcome to Your Design System</h1>
-  <p>Edit this file to customize your hero section.</p>
+<section data-sirius-page>
+  <h1>{{title}}</h1>
+  <p>{{subtitle}}</p>
+  <button data-element-id="cta">{{button_text}}</button>
 </section>
+
+<style>
+  [data-sirius-page] {
+    padding: 2rem;
+    text-align: center;
+  }
+</style>

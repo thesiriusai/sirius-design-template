@@ -13,7 +13,7 @@ sirius.config.json  ← Registry of all pages (must be kept in sync)
 ## How It Works
 
 1. You create HTML files in `pages/`
-2. You register them in `sirius.config.json`
+2. You register them in `sirius.config.json` (including their elements)
 3. You push to `main`
 4. Sirius auto-syncs the pages into your workspace
 5. Pages appear in the Canvas editor where you drag them into funnels
@@ -26,21 +26,48 @@ This file is the registry. Every page must be listed here to be synced.
 {
   "version": 1,
   "pages": {
-    "page-slug": {
-      "file": "pages/filename.html",
-      "format": "html"
+    "skin-type": {
+      "file": "pages/skin-type.html",
+      "format": "html",
+      "elements": ["oily", "dry", "combination", "normal"]
+    },
+    "email-capture": {
+      "file": "pages/email-capture.html",
+      "format": "html",
+      "elements": ["submit"]
+    },
+    "results": {
+      "file": "pages/results.html",
+      "format": "html",
+      "elements": ["cta"]
     }
   }
 }
 ```
 
-- **page-slug**: Unique identifier (kebab-case). Used in URLs and the Canvas.
-- **file**: Path to the HTML file, must start with `pages/`.
-- **format**: Always `"html"` for page components.
+### Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `file` | Yes | Path to the HTML file. Must start with `pages/`. |
+| `format` | No | Always `"html"`. Default if omitted. |
+| `elements` | Yes | Array of element IDs. Each becomes an **output handle** on the Canvas node. |
+
+### Elements
+
+Elements are the interactive parts of a page — buttons, form submits, choices. Each element ID in the config must match a `data-element-id` attribute in the HTML.
+
+On the Canvas, each element becomes an **output handle** that the user connects to the next step. This is how branching works:
+
+- A page with `"elements": ["submit"]` → **1 output** (linear flow)
+- A page with `"elements": ["yes", "no"]` → **2 outputs** (branching)
+- A page with `"elements": ["oily", "dry", "combo", "normal"]` → **4 outputs** (quiz branching)
+
+The Canvas enforces this — you can only connect the outputs that exist.
 
 ## Writing a Page Component
 
-Each page is a self-contained HTML file. It receives dynamic content through JavaScript template variables.
+Each page is a self-contained HTML file. It receives dynamic content through template variables.
 
 ### Minimal Example
 
@@ -59,79 +86,87 @@ Each page is a self-contained HTML file. It receives dynamic content through Jav
 </style>
 ```
 
-### Key Concepts
+Config for this page:
+```json
+{
+  "hero": {
+    "file": "pages/hero.html",
+    "format": "html",
+    "elements": ["cta"]
+  }
+}
+```
 
-#### Template Variables `{{variable_name}}`
+### Template Variables `{{variable_name}}`
 
 Variables are replaced with actual content at runtime. They come from two sources:
 
 1. **Props** — configured by the user in the Canvas editor (e.g., `{{title}}`, `{{button_text}}`)
 2. **Session Bag** — collected from the user during the funnel (e.g., `{{name}}`, `{{email}}`)
 
-#### Elements `data-element-id="..."`
+### Elements `data-element-id="..."`
 
-Interactive elements (buttons, links, form submits) must have a `data-element-id` attribute. These become **output handles** on the Canvas — the user connects them to the next step.
+Every interactive element must have a `data-element-id` attribute **and** be listed in `elements` in the config.
 
 ```html
-<!-- Single CTA -->
+<!-- Single CTA — elements: ["cta"] -->
 <button data-element-id="cta">Continue</button>
 
-<!-- Multiple choices -->
+<!-- Multiple choices — elements: ["option-a", "option-b", "option-c"] -->
 <button data-element-id="option-a">Option A</button>
 <button data-element-id="option-b">Option B</button>
-```
+<button data-element-id="option-c">Option C</button>
 
-Each element ID creates a separate output handle, enabling branching logic.
-
-#### Forms and Data Collection
-
-To collect user input, use standard HTML forms with `data-element-id` on the submit button:
-
-```html
+<!-- Form submit — elements: ["submit"] -->
 <form>
-  <input type="email" name="email" placeholder="Enter your email" required />
-  <button type="submit" data-element-id="submit">Get My Results</button>
+  <input type="email" name="email" placeholder="Your email" required />
+  <button type="submit" data-element-id="submit">Get Results</button>
 </form>
 ```
 
-Form field `name` attributes become keys in the session bag. When the user submits, `bag.email = "user@example.com"` is set automatically.
+### Forms and Data Collection
 
-#### Images
+Form field `name` attributes become keys in the session bag. When the user submits:
 
-Use `{{variable_name}}` for dynamic images:
+```html
+<input type="text" name="name" />    → bag.name = "John"
+<input type="email" name="email" />  → bag.email = "john@example.com"
+```
+
+This data is available in later pages via `{{name}}` and `{{email}}`.
+
+### Images
+
+Use template variables for dynamic images:
 
 ```html
 <img src="{{hero_image}}" alt="{{hero_alt}}" />
 ```
 
-The user uploads/selects images in the Canvas editor when configuring the page.
+The user uploads/selects images in the Canvas editor.
 
-### Page Patterns
+## Page Patterns
 
-#### Quiz / Selection Step
+### Quiz / Selection (multiple outputs)
 
 ```html
 <section data-sirius-page>
   <h2>{{title}}</h2>
   <div class="options">
-    <button data-element-id="option-1" class="option-card">
-      <img src="{{option_1_image}}" alt="" />
-      <span>{{option_1_label}}</span>
-    </button>
-    <button data-element-id="option-2" class="option-card">
-      <img src="{{option_2_image}}" alt="" />
-      <span>{{option_2_label}}</span>
-    </button>
+    <button data-element-id="option-1">{{option_1_label}}</button>
+    <button data-element-id="option-2">{{option_2_label}}</button>
+    <button data-element-id="option-3">{{option_3_label}}</button>
   </div>
 </section>
 ```
 
-#### Lead Capture
+Config: `"elements": ["option-1", "option-2", "option-3"]`
+
+### Lead Capture (single output)
 
 ```html
 <section data-sirius-page>
   <h2>{{title}}</h2>
-  <p>{{subtitle}}</p>
   <form>
     <input type="text" name="name" placeholder="Your name" required />
     <input type="email" name="email" placeholder="Your email" required />
@@ -140,7 +175,9 @@ The user uploads/selects images in the Canvas editor when configuring the page.
 </section>
 ```
 
-#### Results / Personalized
+Config: `"elements": ["submit"]`
+
+### Results / CTA (single output)
 
 ```html
 <section data-sirius-page>
@@ -150,7 +187,9 @@ The user uploads/selects images in the Canvas editor when configuring the page.
 </section>
 ```
 
-#### Interstitial / Loading
+Config: `"elements": ["cta"]`
+
+### Interstitial / Loading (single auto-advance output)
 
 ```html
 <section data-sirius-page>
@@ -172,28 +211,29 @@ The user uploads/selects images in the Canvas editor when configuring the page.
 </style>
 ```
 
+Config: `"elements": ["auto"]` — auto-advance after a timeout set in the Canvas.
+
 ## Adding a New Page
 
 1. Create `pages/my-page.html` with your HTML + CSS
-2. Add it to `sirius.config.json`:
+2. Add `data-element-id` to every button/submit
+3. Register in `sirius.config.json` with all element IDs:
    ```json
-   {
-     "version": 1,
-     "pages": {
-       "hero": { "file": "pages/hero.html", "format": "html" },
-       "my-page": { "file": "pages/my-page.html", "format": "html" }
-     }
+   "my-page": {
+     "file": "pages/my-page.html",
+     "format": "html",
+     "elements": ["submit"]
    }
    ```
-3. Commit and push to `main`
-4. Sirius auto-syncs within seconds
+4. Commit and push to `main`
+5. Sirius auto-syncs within seconds
 
 ## Rules
 
 - Every HTML file must be inside `pages/`
 - Every page must be registered in `sirius.config.json`
 - Page slugs must be unique, kebab-case
-- Use `data-element-id` on all clickable/submittable elements
+- Every `data-element-id` in HTML must be listed in `elements` in the config
+- Every entry in `elements` must have a matching `data-element-id` in the HTML
 - Use `{{variables}}` for dynamic content
 - Keep pages self-contained (inline styles, no external dependencies)
-- Pages are rendered inside an iframe — external scripts won't work

@@ -3,7 +3,8 @@
   "pages": {
     "hero": {
       "file": "pages/hero.html",
-      "format": "html"
+      "format": "html",
+      "elements": ["cta"]
     }
   }
 }
