@@ -399,6 +399,60 @@ Pages that read data stored by previous steps (quiz answers, API responses) and 
 
 Config: `"elements": ["cta"]`
 
+### Booking / External Widget Embed
+
+Embed third-party widgets (Calendly, Cal.com, Stripe Checkout, etc.) inside a page. Load the widget's script, listen for its completion event, then advance.
+
+```html
+<section data-sirius-page>
+  <h2>Book Your Free Consultation</h2>
+  <p>Based on your answers, we recommend a {{duration}}-minute session with a {{expertise}} expert.</p>
+
+  <!-- Calendly inline widget -->
+  <div id="calendly-embed" style="min-width:320px;height:630px;"></div>
+
+  <!-- Fallback: manual link if widget fails to load -->
+  <a data-element-id="external-book" href="{{booking_url}}" target="_blank" style="display:none">
+    Open booking page →
+  </a>
+</section>
+
+<script>
+  // Load Calendly widget script
+  const script = document.createElement('script');
+  script.src = 'https://assets.calendly.com/assets/external/widget.js';
+  script.onload = () => {
+    Calendly.initInlineWidget({
+      url: 'https://calendly.com/your-team/consultation',
+      parentElement: document.getElementById('calendly-embed'),
+      prefill: {
+        name: window.__sirius.bag.name,
+        email: window.__sirius.bag.email,
+      },
+    });
+  };
+  script.onerror = () => {
+    // Show fallback link if script fails
+    document.querySelector('[data-element-id="external-book"]').style.display = 'block';
+    document.getElementById('calendly-embed').style.display = 'none';
+  };
+  document.head.appendChild(script);
+
+  // Listen for Calendly event when booking is confirmed
+  window.addEventListener('message', (e) => {
+    if (e.data.event === 'calendly.event_scheduled') {
+      window.__sirius.bag.booking_confirmed = true;
+      window.__sirius.bag.booking_event = e.data.payload;
+      window.__sirius.complete("booked");
+    }
+  });
+</script>
+```
+
+Config: `"elements": ["booked", "external-book"]`
+
+This pattern works for any third-party widget that fires `postMessage` events. For widgets without events, use a "Continue" button that appears after a delay.
+
 ## Runtime API — `window.__sirius`
 
 Every page has access to the `window.__sirius` object. This is the bridge between page JS and the funnel runtime.
@@ -443,4 +497,5 @@ Every page has access to the `window.__sirius` object. This is the bridge betwee
 - Use `{{variables}}` for dynamic content (HTML only, not in JS/CSS files)
 - Access session data in JS via `window.__sirius.bag`
 - Trigger programmatic navigation via `window.__sirius.complete("element-id")`
-- No external CDN dependencies — bundle everything locally or inline
+- For your own dependencies (Chart.js, D3, GSAP, etc.) — bundle locally or inline via `scripts`/`styles`
+- Third-party embeds (Calendly, Stripe, etc.) may load external scripts dynamically in page JS
