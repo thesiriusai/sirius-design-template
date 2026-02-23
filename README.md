@@ -5,15 +5,19 @@ This repository contains the page components for your Sirius AI funnels. Each HT
 ## Repository Structure
 
 ```
-pages/              ← Your page components (one HTML file per page)
-  hero.html         ← Example page
-sirius.config.json  ← Registry of all pages (must be kept in sync)
+pages/
+  hero.html              ← Simple page (single file)
+  results/
+    index.html           ← Page with separate JS/CSS
+    chart.js
+    style.css
+sirius.config.json       ← Registry of all pages
 ```
 
 ## How It Works
 
 1. You create HTML files in `pages/`
-2. You register them in `sirius.config.json` (including their elements)
+2. You register them in `sirius.config.json` (including elements, scripts, styles)
 3. You push to `main`
 4. Sirius auto-syncs the pages into your workspace
 5. Pages appear in the Canvas editor where you drag them into funnels
@@ -28,18 +32,17 @@ This file is the registry. Every page must be listed here to be synced.
   "pages": {
     "skin-type": {
       "file": "pages/skin-type.html",
-      "format": "html",
       "elements": ["oily", "dry", "combination", "normal"]
     },
     "email-capture": {
       "file": "pages/email-capture.html",
-      "format": "html",
       "elements": ["submit"]
     },
     "results": {
-      "file": "pages/results.html",
-      "format": "html",
-      "elements": ["cta"]
+      "file": "pages/results/index.html",
+      "elements": ["cta"],
+      "scripts": ["pages/results/chart.js"],
+      "styles": ["pages/results/style.css"]
     }
   }
 }
@@ -50,8 +53,9 @@ This file is the registry. Every page must be listed here to be synced.
 | Field | Required | Description |
 |-------|----------|-------------|
 | `file` | Yes | Path to the HTML file. Must start with `pages/`. |
-| `format` | No | Always `"html"`. Default if omitted. |
 | `elements` | Yes | Array of element IDs. Each becomes an **output handle** on the Canvas node. |
+| `scripts` | No | Array of JS file paths to include with the page. |
+| `styles` | No | Array of CSS file paths to include with the page. |
 
 ### Elements
 
@@ -59,17 +63,17 @@ Elements are the interactive parts of a page — buttons, form submits, choices.
 
 On the Canvas, each element becomes an **output handle** that the user connects to the next step. This is how branching works:
 
-- A page with `"elements": ["submit"]` → **1 output** (linear flow)
-- A page with `"elements": ["yes", "no"]` → **2 outputs** (branching)
-- A page with `"elements": ["oily", "dry", "combo", "normal"]` → **4 outputs** (quiz branching)
+- `"elements": ["submit"]` → **1 output** (linear flow)
+- `"elements": ["yes", "no"]` → **2 outputs** (branching)
+- `"elements": ["oily", "dry", "combo", "normal"]` → **4 outputs** (quiz branching)
 
 The Canvas enforces this — you can only connect the outputs that exist.
 
 ## Writing a Page Component
 
-Each page is a self-contained HTML file. It receives dynamic content through template variables.
+Each page is an HTML file. It receives dynamic content through template variables. You can include everything inline, or split JS/CSS into separate files.
 
-### Minimal Example
+### Simple Page (single file)
 
 ```html
 <section data-sirius-page>
@@ -79,23 +83,48 @@ Each page is a self-contained HTML file. It receives dynamic content through tem
 </section>
 
 <style>
-  [data-sirius-page] {
-    padding: 2rem;
-    text-align: center;
-  }
+  [data-sirius-page] { padding: 2rem; text-align: center; }
 </style>
 ```
 
-Config for this page:
+### Page with Separate JS/CSS
+
+For interactive pages (charts, animations, visualizations), split into multiple files:
+
+**pages/results/index.html**
+```html
+<section data-sirius-page>
+  <h1>Your Results</h1>
+  <canvas id="results-chart" width="400" height="300"></canvas>
+  <button data-element-id="cta">{{cta_text}}</button>
+</section>
+```
+
+**pages/results/chart.js**
+```js
+const ctx = document.getElementById('results-chart').getContext('2d');
+// Use any vanilla JS — Chart.js, D3, GSAP, Lottie, Three.js, etc.
+// Access bag data via window.__sirius.bag
+const score = window.__sirius.bag.score || 75;
+// ... draw chart based on user's answers
+```
+
+**pages/results/style.css**
+```css
+#results-chart { max-width: 100%; margin: 1rem auto; }
+```
+
+**Config:**
 ```json
-{
-  "hero": {
-    "file": "pages/hero.html",
-    "format": "html",
-    "elements": ["cta"]
-  }
+"results": {
+  "file": "pages/results/index.html",
+  "elements": ["cta"],
+  "scripts": ["pages/results/chart.js"],
+  "styles": ["pages/results/style.css"]
 }
 ```
+
+Scripts have access to `window.__sirius.bag` — the session data collected from previous steps.
 
 ### Template Variables `{{variable_name}}`
 
@@ -126,14 +155,14 @@ Every interactive element must have a `data-element-id` attribute **and** be lis
 
 ### Forms and Data Collection
 
-Form field `name` attributes become keys in the session bag. When the user submits:
+Form field `name` attributes become keys in the session bag:
 
 ```html
 <input type="text" name="name" />    → bag.name = "John"
 <input type="email" name="email" />  → bag.email = "john@example.com"
 ```
 
-This data is available in later pages via `{{name}}` and `{{email}}`.
+This data is available in later pages via `{{name}}`, `{{email}}`, and `window.__sirius.bag`.
 
 ### Images
 
@@ -142,8 +171,6 @@ Use template variables for dynamic images:
 ```html
 <img src="{{hero_image}}" alt="{{hero_alt}}" />
 ```
-
-The user uploads/selects images in the Canvas editor.
 
 ## Page Patterns
 
@@ -177,19 +204,26 @@ Config: `"elements": ["option-1", "option-2", "option-3"]`
 
 Config: `"elements": ["submit"]`
 
-### Results / CTA (single output)
+### Interactive Results with Chart
 
 ```html
 <section data-sirius-page>
-  <h1>{{personalized_headline}}</h1>
+  <h1>{{headline}}</h1>
+  <canvas id="chart"></canvas>
   <p>{{recommendation}}</p>
   <button data-element-id="cta">{{cta_text}}</button>
 </section>
+
+<script>
+  const bag = window.__sirius.bag;
+  const ctx = document.getElementById('chart').getContext('2d');
+  // Draw personalized chart based on bag data
+</script>
 ```
 
 Config: `"elements": ["cta"]`
 
-### Interstitial / Loading (single auto-advance output)
+### Animated Loading / Interstitial
 
 ```html
 <section data-sirius-page>
@@ -215,14 +249,22 @@ Config: `"elements": ["auto"]` — auto-advance after a timeout set in the Canva
 
 ## Adding a New Page
 
-1. Create `pages/my-page.html` with your HTML + CSS
+1. Create your HTML file (and optional JS/CSS) in `pages/`
 2. Add `data-element-id` to every button/submit
-3. Register in `sirius.config.json` with all element IDs:
+3. Register in `sirius.config.json`:
    ```json
    "my-page": {
      "file": "pages/my-page.html",
-     "format": "html",
      "elements": ["submit"]
+   }
+   ```
+   Or with separate files:
+   ```json
+   "my-page": {
+     "file": "pages/my-page/index.html",
+     "elements": ["submit"],
+     "scripts": ["pages/my-page/app.js"],
+     "styles": ["pages/my-page/style.css"]
    }
    ```
 4. Commit and push to `main`
@@ -230,10 +272,10 @@ Config: `"elements": ["auto"]` — auto-advance after a timeout set in the Canva
 
 ## Rules
 
-- Every HTML file must be inside `pages/`
+- All files must be inside `pages/`
 - Every page must be registered in `sirius.config.json`
 - Page slugs must be unique, kebab-case
 - Every `data-element-id` in HTML must be listed in `elements` in the config
-- Every entry in `elements` must have a matching `data-element-id` in the HTML
-- Use `{{variables}}` for dynamic content
-- Keep pages self-contained (inline styles, no external dependencies)
+- Use `{{variables}}` for dynamic content (HTML only, not in JS/CSS files)
+- Access session data in JS via `window.__sirius.bag`
+- No external CDN dependencies — bundle everything locally or inline
