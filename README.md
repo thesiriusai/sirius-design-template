@@ -40,7 +40,7 @@ This file is the registry. Every page must be listed here to be synced.
 
 ## Writing a Page Component
 
-Each page is a self-contained HTML file. It receives data through CSS custom properties (theme) and JavaScript template variables (content).
+Each page is a self-contained HTML file. It receives dynamic content through JavaScript template variables.
 
 ### Minimal Example
 
@@ -53,20 +53,8 @@ Each page is a self-contained HTML file. It receives data through CSS custom pro
 
 <style>
   [data-sirius-page] {
-    font-family: var(--sirius-font, 'Inter', sans-serif);
-    background: var(--sirius-bg, #ffffff);
-    color: var(--sirius-text, #111827);
     padding: 2rem;
     text-align: center;
-  }
-  button {
-    background: var(--sirius-primary, #2563EB);
-    color: #fff;
-    border: none;
-    border-radius: var(--sirius-radius, 8px);
-    padding: 0.75rem 2rem;
-    font-size: 1rem;
-    cursor: pointer;
   }
 </style>
 ```
@@ -95,21 +83,6 @@ Interactive elements (buttons, links, form submits) must have a `data-element-id
 
 Each element ID creates a separate output handle, enabling branching logic.
 
-#### Theme Variables (CSS Custom Properties)
-
-The brand's design tokens are injected as CSS custom properties:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `--sirius-primary` | Primary brand color | `#2563EB` |
-| `--sirius-secondary` | Secondary color | `#1E40AF` |
-| `--sirius-bg` | Background color | `#ffffff` |
-| `--sirius-text` | Text color | `#111827` |
-| `--sirius-font` | Font family | `'Inter', sans-serif` |
-| `--sirius-radius` | Border radius | `8px` |
-
-Always use `var(--sirius-*)` with fallbacks so pages look good even without theme injection.
-
 #### Forms and Data Collection
 
 To collect user input, use standard HTML forms with `data-element-id` on the submit button:
@@ -133,7 +106,7 @@ Use `{{variable_name}}` for dynamic images:
 
 The user uploads/selects images in the Canvas editor when configuring the page.
 
-### Page Types & Patterns
+### Page Patterns
 
 #### Quiz / Selection Step
 
@@ -190,7 +163,7 @@ The user uploads/selects images in the Canvas editor when configuring the page.
 <style>
   .spinner {
     width: 40px; height: 40px;
-    border: 3px solid var(--sirius-primary, #2563EB);
+    border: 3px solid #2563EB;
     border-top-color: transparent;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
@@ -222,6 +195,5 @@ The user uploads/selects images in the Canvas editor when configuring the page.
 - Page slugs must be unique, kebab-case
 - Use `data-element-id` on all clickable/submittable elements
 - Use `{{variables}}` for dynamic content
-- Use `var(--sirius-*)` CSS properties for theming
 - Keep pages self-contained (inline styles, no external dependencies)
 - Pages are rendered inside an iframe — external scripts won't work
