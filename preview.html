@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sirius Page Preview</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #111; color: #fff; height: 100vh; display: flex; }
+
+  /* Sidebar */
+  .sidebar { width: 280px; background: #1a1a1a; border-right: 1px solid #333; display: flex; flex-direction: column; flex-shrink: 0; }
+  .sidebar-header { padding: 16px; border-bottom: 1px solid #333; }
+  .sidebar-header h1 { font-size: 14px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.05em; }
+  .page-list { flex: 1; overflow-y: auto; padding: 8px; }
+  .page-item { padding: 10px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #ccc; transition: background 0.15s; }
+  .page-item:hover { background: #2a2a2a; }
+  .page-item.active { background: #2563EB; color: #fff; }
+  .page-item .elements { font-size: 11px; color: #666; margin-top: 2px; }
+  .page-item.active .elements { color: rgba(255,255,255,0.6); }
+
+  /* Mock data panel */
+  .mock-panel { border-top: 1px solid #333; padding: 12px; max-height: 300px; overflow-y: auto; }
+  .mock-panel h2 { font-size: 11px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .mock-field { margin-bottom: 8px; }
+  .mock-field label { display: block; font-size: 11px; color: #888; margin-bottom: 2px; }
+  .mock-field input { width: 100%; background: #222; border: 1px solid #444; border-radius: 4px; padding: 6px 8px; color: #fff; font-size: 12px; }
+  .mock-field input:focus { outline: none; border-color: #2563EB; }
+
+  /* Preview area */
+  .preview-area { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 24px; background: #0a0a0a; overflow-y: auto; }
+  .device-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+  .device-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid #333; background: #1a1a1a; color: #999; font-size: 12px; cursor: pointer; }
+  .device-btn.active { background: #2563EB; border-color: #2563EB; color: #fff; }
+  .phone-frame { background: #000; border-radius: 40px; padding: 12px; box-shadow: 0 0 0 2px #333, 0 20px 60px rgba(0,0,0,0.5); transition: width 0.3s; overflow: hidden; }
+  .phone-frame.mobile { width: 393px; }
+  .phone-frame.tablet { width: 768px; }
+  .phone-frame.desktop { width: 1024px; }
+  .phone-screen { background: #fff; border-radius: 28px; overflow: hidden; min-height: 600px; }
+  .phone-screen iframe { width: 100%; min-height: 600px; border: none; display: block; }
+
+  /* Empty state */
+  .empty-state { flex: 1; display: flex; align-items: center; justify-content: center; color: #555; font-size: 14px; }
+  .empty-state p { text-align: center; line-height: 1.6; }
+
+  /* Error */
+  .error-msg { background: #3B1111; border: 1px solid #7F1D1D; border-radius: 8px; padding: 16px; color: #FCA5A5; font-size: 13px; max-width: 400px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h1>Sirius Preview</h1>
+  </div>
+  <div class="page-list" id="pageList"></div>
+  <div class="mock-panel" id="mockPanel" style="display:none">
+    <h2>Mock Data</h2>
+    <div id="mockFields"></div>
+  </div>
+</div>
+
+<div class="preview-area">
+  <div class="device-bar">
+    <button class="device-btn active" data-device="mobile">Mobile</button>
+    <button class="device-btn" data-device="tablet">Tablet</button>
+    <button class="device-btn" data-device="desktop">Desktop</button>
+  </div>
+  <div id="previewContainer">
+    <div class="empty-state">
+      <p>Select a page from the sidebar to preview.<br><br>
+      <strong>Start with:</strong><br>
+      <code style="color:#2563EB">npx serve .</code> or <code style="color:#2563EB">python3 -m http.server</code><br>
+      then open this file in your browser.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(async function() {
+  let config;
+  let currentSlug = null;
+  let mockData = {};
+  let currentDevice = 'mobile';
+
+  // 1. Load config
+  try {
+    const res = await fetch('./sirius.config.json');
+    config = await res.json();
+  } catch(e) {
+    document.getElementById('previewContainer').innerHTML =
+      '<div class="error-msg">Could not load sirius.config.json.<br><br>Make sure you\'re running a local server:<br><code>npx serve .</code></div>';
+    return;
+  }
+
+  // 2. Render page list
+  const pageList = document.getElementById('pageList');
+  const slugs = Object.keys(config.pages);
+
+  if (slugs.length === 0) {
+    pageList.innerHTML = '<div style="padding:16px;color:#555;font-size:13px">No pages in config.</div>';
+    return;
+  }
+
+  slugs.forEach(slug => {
+    const entry = config.pages[slug];
+    const div = document.createElement('div');
+    div.className = 'page-item';
+    div.dataset.slug = slug;
+    div.innerHTML = `<div>${slug}</div><div class="elements">${entry.elements.length} element${entry.elements.length !== 1 ? 's' : ''}: ${entry.elements.join(', ') || 'none'}</div>`;
+    div.onclick = () => selectPage(slug);
+    pageList.appendChild(div);
+  });
+
+  // 3. Device switcher
+  document.querySelectorAll('.device-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.device-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentDevice = btn.dataset.device;
+      const frame = document.querySelector('.phone-frame');
+      if (frame) {
+        frame.className = 'phone-frame ' + currentDevice;
+      }
+    };
+  });
+
+  // 4. Select and preview a page
+  async function selectPage(slug) {
+    currentSlug = slug;
+
+    // Highlight active
+    document.querySelectorAll('.page-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.slug === slug);
+    });
+
+    const entry = config.pages[slug];
+
+    // Load HTML
+    let html;
+    try {
+      const res = await fetch('./' + entry.file);
+      html = await res.text();
+    } catch(e) {
+      document.getElementById('previewContainer').innerHTML =
+        `<div class="error-msg">Could not load ${entry.file}</div>`;
+      return;
+    }
+
+    // Load CSS files
+    let css = '';
+    for (const stylePath of (entry.styles || [])) {
+      try {
+        const res = await fetch('./' + stylePath);
+        css += await res.text() + '\n';
+      } catch(e) { /* skip */ }
+    }
+
+    // Load JS files
+    let js = '';
+    for (const scriptPath of (entry.scripts || [])) {
+      try {
+        const res = await fetch('./' + scriptPath);
+        js += await res.text() + '\n';
+      } catch(e) { /* skip */ }
+    }
+
+    // Extract {{variables}} from HTML
+    const vars = [...new Set((html.match(/\{\{([^}]+)\}\}/g) || []).map(v => v.slice(2, -2).trim()))];
+
+    // Show mock data panel
+    const mockPanel = document.getElementById('mockPanel');
+    const mockFields = document.getElementById('mockFields');
+    if (vars.length > 0) {
+      mockPanel.style.display = 'block';
+      mockFields.innerHTML = '';
+      vars.forEach(v => {
+        const div = document.createElement('div');
+        div.className = 'mock-field';
+        const defaultVal = mockData[v] || v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        if (!mockData[v]) mockData[v] = defaultVal;
+        div.innerHTML = `<label>{{${v}}}</label><input type="text" data-var="${v}" value="${defaultVal}" />`;
+        div.querySelector('input').oninput = (e) => {
+          mockData[v] = e.target.value;
+          renderPreview(html, css, js, entry);
+        };
+        mockFields.appendChild(div);
+      });
+    } else {
+      mockPanel.style.display = 'none';
+    }
+
+    renderPreview(html, css, js, entry);
+  }
+
+  function renderPreview(html, css, js, entry) {
+    // Replace {{variables}} with mock data
+    let rendered = html.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
+      return mockData[key.trim()] || match;
+    });
+
+    // Build full HTML document
+    const doc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>${css}</style>
+</head>
+<body>
+${rendered}
+<script>
+// Mock window.__sirius for preview
+window.__sirius = {
+  bag: new Proxy({}, {
+    get(t, p) { return t[p]; },
+    set(t, p, v) { t[p] = v; return true; }
+  }),
+  complete: function(id) { console.log('[Sirius Preview] complete("' + id + '")'); },
+  navigateTo: function(slug) { console.log('[Sirius Preview] navigateTo("' + slug + '")'); },
+  manifest: {},
+  events: { track: function() {}, flush: function() {}, init: function() {}, getActivePlatforms: function() { return []; } }
+};
+<\/script>
+<script>${js}<\/script>
+</body>
+</html>`;
+
+    // Render in iframe
+    const container = document.getElementById('previewContainer');
+    container.innerHTML = `<div class="phone-frame ${currentDevice}"><div class="phone-screen"><iframe id="previewFrame"></iframe></div></div>`;
+
+    const iframe = document.getElementById('previewFrame');
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(doc);
+    iframeDoc.close();
+
+    // Auto-resize iframe to content
+    setTimeout(() => {
+      try {
+        const h = iframeDoc.body.scrollHeight;
+        iframe.style.height = Math.max(h, 600) + 'px';
+      } catch(e) {}
+    }, 100);
+  }
+})();
+</script>
+</body>
+</html>

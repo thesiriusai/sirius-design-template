@@ -1,10 +1,4 @@
 {
   "version": 1,
-  "pages": {
-    "hero": {
-      "file": "pages/hero.html",
-      "format": "html",
-      "elements": ["cta"]
-    }
-  }
+  "pages": {}
 }
